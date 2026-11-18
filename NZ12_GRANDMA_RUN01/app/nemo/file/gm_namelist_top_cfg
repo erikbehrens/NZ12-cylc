@@ -1,0 +1,41 @@
+! Grandmother MY_TRC unit tracer (cold tracer start)
+&namtrc_run
+   ln_top_euler = .false.
+/
+&namtrc
+   jp_bgc = 1
+   ln_pisces = .false.
+   ln_my_trc = .true.
+   ln_age = .false.
+   ln_cfc11 = .false.
+   ln_cfc12 = .false.
+   ln_sf6 = .false.
+   ln_c14 = .false.
+/
+&namtrc_dta
+/
+&namtrc_snk
+   ln_sink_slg = .true.
+   ln_sink_mus = .false.
+/
+&namtrc_adv
+   ln_trcadv_fct = .true.
+   nn_fct_h = 2
+   nn_fct_v = 2
+   nn_fct_imp = 2
+/
+&namtrc_ldf
+   ln_trcldf_tra = .true.
+/
+&namtrc_rad
+/
+&namtrc_dmp
+/
+&namtrc_ice
+/
+&namtrc_trd
+/
+&namtrc_bc
+/
+&namtrc_bdy
+/

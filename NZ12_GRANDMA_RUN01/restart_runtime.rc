@@ -1,0 +1,212 @@
+{% if TEST_RESTART %}
+
+    [[ocean_ice_crun]]
+        inherit = OCEAN_ICE, OCEAN_ICE_RESOURCE
+        [[[environment]]]
+            DATAM      = $CYLC_WORKFLOW_SHARE_DIR/data/{{DATAM}}
+            NEMO_DATA  = $DATAM/ocean_ice_crun/NEMO_crun
+            NEMO_RST   = $NEMO_DATA/
+
+    [[ocean_ice_lrun]]
+        inherit = OCEAN_ICE, OCEAN_ICE_RESOURCE
+        execution time limit = \
+        PT{{'%02d' % (CLOCK_RESTART_LRUN[0])}}H{{'%02d' % (CLOCK_RESTART_LRUN[1])}}M{{'%02d' % (CLOCK_RESTART_LRUN[2])}}S
+        [[[environment]]]
+            DATAM      = $CYLC_WORKFLOW_SHARE_DIR/data/{{DATAM}}
+            NEMO_DATA  = $DATAM/ocean_ice_lrun/NEMO_lrun
+            NEMO_RST   = $NEMO_DATA/
+
+            TASKEND    = $( ROSE_CYCLING_MODE={{CALENDAR}}  isodatetime \
+            $CYLC_WORKFLOW_INITIAL_CYCLE_POINT $CYLC_TASK_CYCLE_POINT --offset -{{CYCLE_LRUN}} --print-format y,m,d,h,M,s )
+            TASKLENGTH = $( ROSE_CYCLING_MODE={{CALENDAR}} isodatetime \
+            $CYLC_TASK_CYCLE_POINT $CYLC_TASK_CYCLE_POINT -s {{CYCLE_LRUN}} -f y,m,d,h,M,s )
+
+{% if TEST_NRUN_NRUN %}
+    [[ocean_ice_nrun]]
+        inherit = OCEAN_ICE, OCEAN_ICE_RESOURCE
+        [[[environment]]]
+            ROSE_APP_OPT_CONF_KEYS={{OCEAN_ICE_OPT_KEYS}} \
+            $( if [[ $CYLC_TASK_CYCLE_POINT == $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]]; \
+            then echo ""; else echo "nrun"; fi)
+            CONTINUE = ""
+{% if CYCLE == 'D' %}
+            TASKEND    = 0,0,{{RESUB}},0,0,0
+{% elif CYCLE == 'M' %}
+            TASKEND    = 0,{{RESUB}},0,0,0,0
+{% endif %}
+            TASKLENGTH    = $( ROSE_CYCLING_MODE={{CALENDAR}} isodatetime $CYLC_TASK_CYCLE_POINT \
+            $CYLC_TASK_CYCLE_POINT -s {{CYCLE_NRUN}} -f y,m,d,h,M,s )
+            PREVIOUS_CYCLE = $(isodatetime ref --print-format='%Y%m%dT%H%MZ' --offset=-{{CYCLE_NRUN}})
+            MODELBASIS = $(isodatetime --print-format='%Y,%m,%d,%H,%M,%S' $CYLC_TASK_CYCLE_POINT)
+            DATAM      = ${CYLC_WORKFLOW_SHARE_DIR}/data/{{DATAM}}
+            NEMO_DATA  = $DATAM/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}
+            NEMO_RST   = $NEMO_DATA/
+            NEMO_RESTART_MULTI = $( if [[ $CYLC_TASK_CYCLE_POINT == $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]]; \
+            then echo ""; else echo "$DATAM/ocean_ice_nrun/NEMO_nrun_${PREVIOUS_CYCLE}/${RUNID}o_$(isodatetime \
+            --print-format='%Y%m%d' ${CYLC_TASK_CYCLE_POINT})_restart"; fi )
+            ICEBERG_RESTART_MULTI = $( if [[ $CYLC_TASK_CYCLE_POINT == $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]]; \
+            then echo ""; else echo "$DATAM/ocean_ice_nrun/NEMO_nrun_${PREVIOUS_CYCLE}/${RUNID}o_icebergs_$(isodatetime \
+            --print-format='%Y%m%d' ${CYLC_TASK_CYCLE_POINT})_restart"; fi )
+
+            NEMO_START = $( if [[ $CYLC_TASK_CYCLE_POINT == $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]]; \
+            then echo ""; else echo "${NEMO_RESTART_MULTI}.nc"; fi )
+            NEMO_ICEBERG_START= $( if [[ $CYLC_TASK_CYCLE_POINT == $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]]; \
+            then echo ""; else echo "${ICEBERG_RESTART_MULTI}.nc"; fi )
+            NEMO_ICEBERGS_START=$NEMO_ICEBERG_START
+            SI3_RESTART_MULTI = $( if [[ $CYLC_TASK_CYCLE_POINT == $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]]; \
+            then echo ""; else echo "$DATAM/ocean_ice_nrun/NEMO_nrun_${PREVIOUS_CYCLE}/\
+            ${RUNID}o_$(isodatetime --print-format='%Y%m%d' ${CYLC_TASK_CYCLE_POINT})_restart_ice"; fi )
+            SI3_START = $( if [[ $CYLC_TASK_CYCLE_POINT == $CYLC_WORKFLOW_INITIAL_CYCLE_POINT ]]; \
+            then echo ""; else echo "${SI3_RESTART_MULTI}.nc"; fi )
+
+{% endif %}
+
+    [[NEMO_REBUILD]]
+        [[[environment]]]
+            ROSE_TASK_APP = nemo_rebuild_restart
+            REBUILD_NEMO_SCRIPT={{REBUILD_NEMO_SCRIPT}}
+            NUM_RESTART_FILES=$NEMO_NPROC
+
+    [[NEMO_REBUILD_RESOURCE]]
+        inherit=None, HPC_UM
+        execution time limit = {{REBUILD_TIME_LIMIT}}
+        platforms = {{ COMPUTE_HOST }}
+        [[[directives]]]
+            -q = shared
+            -l mem = 25gb
+            -l ncpus=1
+
+
+    [[nemo_rebuild_restart_lrun]]
+        inherit = None, NEMO_REBUILD, NEMO_REBUILD_RESOURCE
+        [[[environment]]]
+            NEMO_RESTART_PATH = $DATAM/ocean_ice_lrun/NEMO_lrun/${RUNID}o_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{CYCLE_LRUN}})_restart
+            ICEBERG_RESTART_PATH = $DATAM/ocean_ice_lrun/NEMO_lrun/${RUNID}o_icebergs_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{CYCLE_LRUN}})_restart
+            ICB_RESTART_PATH = $DATAM/ocean_ice_lrun/NEMO_lrun/${RUNID}o_icebergs_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{CYCLE_LRUN}})_restart_
+            ICEBERG_REBUILT_PATH = $DATAM/ocean_ice_lrun/NEMO_lrun/${RUNID}o_icebergs_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{CYCLE_LRUN}})_restart.nc
+            SI3_RESTART_PATH = $DATAM/ocean_ice_lrun/NEMO_lrun/${RUNID}o_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{CYCLE_LRUN}})_restart_ice
+
+    [[nemo_rebuild_restart_crun]]
+        inherit = None, NEMO_REBUILD, NEMO_REBUILD_RESOURCE
+        [[[environment]]]
+            NEMO_RESTART_PATH = $DATAM/ocean_ice_crun/NEMO_crun/${RUNID}o_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart
+            ICEBERG_RESTART_PATH = $DATAM/ocean_ice_crun/NEMO_crun/${RUNID}o_icebergs_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart
+            ICB_RESTART_PATH = $DATAM/ocean_ice_crun/NEMO_crun/${RUNID}o_icebergs_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart_
+            ICEBERG_REBUILT_PATH = $DATAM/ocean_ice_crun/NEMO_crun/${RUNID}o_icebergs_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart.nc
+            SI3_RESTART_PATH = $DATAM/ocean_ice_crun/NEMO_crun/${RUNID}o_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart_ice
+
+    [[VALIDATE_RESOURCE]]
+        inherit = None, HPC_UM
+        pre-script = "module load scitools/production-os46-3"
+        execution time limit = {{VALIDATE_TIME_LIMIT}}
+        platforms = {{ COMPUTE_HOST }}
+        [[[directives]]]
+            -q = shared
+            -l mem = 15gb
+            -l ncpus=1
+
+    [[validate_lrun_crun]]
+        inherit = None, VALIDATE_RESOURCE
+        [[[environment]]]
+            ROSE_TASK_APP = validate_nemo_output
+            LRUN_CYCLE_POINT = $(isodatetime ref --print-format='%Y%m%dT%H%MZ' --offset=-{{FMT}})
+            RUNSTAT_FILE1=$CYLC_WORKFLOW_WORK_DIR/${LRUN_CYCLE_POINT}/ocean_ice_lrun/run.stat
+            RUNSTAT_FILE2=$CYLC_WORKFLOW_WORK_DIR/${CYLC_TASK_CYCLE_POINT}/ocean_ice_crun/run.stat
+            RUNSTAT_TIMESTEP_OFFSET=0
+            NEMO_FILE1=$ROSE_DATA/History_Data/ocean_ice_lrun/NEMO_lrun/${RUNID}o_$(isodatetime ref \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart.nc
+            NEMO_FILE2=$ROSE_DATA/History_Data/ocean_ice_crun/NEMO_crun/${RUNID}o_$(isodatetime ref \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart.nc
+            IBERG_FILE1=$ROSE_DATA/History_Data/ocean_ice_lrun/NEMO_lrun/${RUNID}o_icebergs_$(isodatetime ref \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart.nc
+            IBERG_FILE2=$ROSE_DATA/History_Data/ocean_ice_crunA/NEMO_crun/${RUNID}o_icebergs_$(isodatetime ref \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart.nc
+            SI3_FILE1=$ROSE_DATA/History_Data/ocean_ice_lrun/NEMO_lrun/${RUNID}o_$(isodatetime ref \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart_ice.nc
+            SI3_FILE2=$ROSE_DATA/History_Data/ocean_ice_crun/NEMO_crun/${RUNID}o_$(isodatetime ref \
+            --print-format='%Y%m%d' --offset={{FMT}})_restart_ice.nc
+
+
+{% if TEST_NRUN_NRUN %}
+    [[nemo_rebuild_restart_nrun]]
+        inherit = None, NEMO_REBUILD, NEMO_REBUILD_RESOURCE
+        [[[environment]]]
+            NEMO_RESTART_PATH = $DATAM/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}/\
+            ${RUNID}o_$(isodatetime ref  --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart
+            ICEBERG_RESTART_PATH = $DATAM/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}/\
+            ${RUNID}o_icebergs_$(isodatetime ref  --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart
+            ICB_RESTART_PATH = $DATAM/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}/\
+            ${RUNID}o_icebergs_$(isodatetime ref  --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart_
+            ICEBERG_REBUILT_PATH = $DATAM/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}/\
+            ${RUNID}o_icebergs_$(isodatetime ref  --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart.nc
+            SI3_RESTART_PATH = $DATAM/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}/${RUNID}o_$(isodatetime ref  \
+            --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart_ice
+
+    [[validate_lrun_nrun]]
+        inherit = None, VALIDATE_RESOURCE
+        [[[environment]]]
+            ROSE_TASK_APP = validate_nemo_output
+            LRUN_CYCLE_POINT = $(isodatetime ref --print-format='%Y%m%dT%H%MZ' --offset=-{{CYCLE_NRUN}})
+            RUNSTAT_FILE1=$CYLC_WORKFLOW_WORK_DIR/${LRUN_CYCLE_POINT}/ocean_ice_lrun/run.stat
+            RUNSTAT_FILE2=$CYLC_WORKFLOW_WORK_DIR/${CYLC_TASK_CYCLE_POINT}/ocean_ice_nrun/run.stat
+            NEMO_FILE1=$ROSE_DATA/History_Data/ocean_ice_lrun/NEMO_lrun/${RUNID}o_$(isodatetime ref --print-format='%Y%m%d' \
+            --offset={{CYCLE_NRUN}})_restart.nc
+            NEMO_FILE2=$ROSE_DATA/History_Data/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}/\
+            ${RUNID}o_$(isodatetime ref --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart.nc
+            DAYS_ELAPSED_AT_CYCLE= $(isodatetime ref --calendar=365day ${CYLC_WORKFLOW_INITIAL_CYCLE_POINT} \
+            ${CYLC_TASK_CYCLE_POINT} -f d)
+            RUNSTAT_TIMESTEP_OFFSET=$(expr {{TIMESTEPS_PER_DAY}} \* ${DAYS_ELAPSED_AT_CYCLE})
+            SI3_FILE1=$ROSE_DATA/History_Data/ocean_ice_lrun/NEMO_lrun/\
+            ${RUNID}o_$(isodatetime ref --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart_ice.nc
+            SI3_FILE2=$ROSE_DATA/History_Data/ocean_ice_nrun/NEMO_nrun_${CYLC_TASK_CYCLE_POINT}/\
+            ${RUNID}o_$(isodatetime ref --print-format='%Y%m%d' --offset={{CYCLE_NRUN}})_restart_ice.nc
+
+{% endif %}
+
+    [[housekeeping_restart_work]]
+        inherit = None, VALIDATE_RESOURCE
+{% if TEST_NRUN_NRUN %}
+        script = "housekeeping_restart work --lrun_work=${LRUN_WORK_DIR} --crun_work_1=${CRUN1_WORK_DIR} \
+        --crun_work_2=${CRUN2_WORK_DIR}  --nrun_work_1=${NRUN1_WORK_DIR} --nrun_work_2=${NRUN2_WORK_DIR}"
+{% else %}
+        script = "housekeeping_restart work --lrun_work=${LRUN_WORK_DIR} --crun_work_1=${CRUN1_WORK_DIR} \
+        --crun_work_2=${CRUN2_WORK_DIR} "
+{% endif %}
+
+        [[[environment]]]
+            LRUN_CYCLE_POINT = $(isodatetime ref --print-format='%Y%m%dT%H%MZ' --offset=-{{CYCLE_NRUN}})
+            LRUN_WORK_DIR=$CYLC_WORKFLOW_WORK_DIR/${LRUN_CYCLE_POINT}/ocean_ice_lrun
+            CRUN1_WORK_DIR=$CYLC_WORKFLOW_WORK_DIR/${LRUN_CYCLE_POINT}/ocean_ice_crun
+            CRUN2_WORK_DIR=$CYLC_WORKFLOW_WORK_DIR/${CYLC_TASK_CYCLE_POINT}/ocean_ice_crun/
+{% if TEST_NRUN_NRUN %}
+            NRUN1_WORK_DIR=$CYLC_WORKFLOW_WORK_DIR/${LRUN_CYCLE_POINT}/ocean_ice_nrun
+            NRUN2_WORK_DIR=$CYLC_WORKFLOW_WORK_DIR/${CYLC_TASK_CYCLE_POINT}/ocean_ice_nrun/
+{% endif %}
+
+    [[housekeeping_restart_share]]
+        inherit = None, VALIDATE_RESOURCE
+{% if TEST_NRUN_NRUN %}
+    script = "housekeeping_restart shared --lrun_shared=${LRUN_SHARED} --crun_shared=${CRUN_SHARED} \
+        --nrun_shared=${NRUN_SHARED} "
+{% else %}
+    script = "housekeeping_restart shared --lrun_shared=${LRUN_SHARED} --crun_shared=${CRUN_SHARED} "
+{% endif %}
+        [[[environment]]]
+            LRUN_CYCLE_POINT = $(isodatetime ref --print-format='%Y%m%dT%H%MZ' --offset=-{{CYCLE_NRUN}})
+            LRUN_SHARED=${CYLC_WORKFLOW_SHARE_DIR}/data/{{DATAM}}/ocean_ice_lrun/
+            CRUN_SHARED=${CYLC_WORKFLOW_SHARE_DIR}/data/{{DATAM}}/ocean_ice_crun/
+{% if TEST_NRUN_NRUN %}
+            NRUN_SHARED=${CYLC_WORKFLOW_SHARE_DIR}/data/{{DATAM}}/ocean_ice_nrun/
+{% endif %}
+
+{% endif %}

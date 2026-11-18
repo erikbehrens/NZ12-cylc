@@ -1,0 +1,9 @@
+
+
+&nampismod
+   ln_p2z      = .false.
+   ln_p4z      = .true.
+   ln_p5z      = .false.
+   ln_ligand   = .false.
+   ln_sediment = .false.
+/

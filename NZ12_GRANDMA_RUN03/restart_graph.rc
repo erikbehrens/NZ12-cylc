@@ -1,0 +1,61 @@
+
+{% if TEST_RESTART %}
+    [[graph]]
+        R1 = """
+        fcm_make2_ocean & fcm_make2_drivers => ocean_ice_lrun
+        fcm_make2_ocean & fcm_make2_drivers => ocean_ice_crun
+        """
+
+        [[[ graph ]]]
+            R4//{{FMT}} = """
+                ocean_ice_crun =>nemo_rebuild_restart_crun
+                ocean_ice_crun [-{{FMT}}]=> ocean_ice_crun
+            """
+
+        [[[ graph ]]]
+            R2//{{CYCLE_LRUN}} = """
+                ocean_ice_lrun[-{{CYCLE_LRUN}}] => ocean_ice_lrun =>nemo_rebuild_restart_lrun
+                ocean_ice_crun => nemo_rebuild_restart_crun
+            """
+
+        [[[ graph ]]]
+            R2/^+{{FMT}}/{{CYCLE_LRUN}} = """
+                nemo_rebuild_restart_lrun[-{{FMT}}] => validate_lrun_crun
+                nemo_rebuild_restart_crun => validate_lrun_crun {{ '=> housekeeping_restart_work' if HOUSEKEEP else '' }}
+            """
+
+{% if HOUSEKEEP %}
+        [[[ graph ]]]
+            R1/^+{{FMT}}+{{CYCLE_LRUN}} = """
+                validate_lrun_crun => housekeeping_restart_share
+            """
+{% endif %}
+
+{% if TEST_NRUN_NRUN %}
+        [[[graph]]]
+            R1= = """
+                fcm_make2_ocean & fcm_make2_drivers => ocean_ice_nrun
+            """
+
+        [[[ graph ]]]
+            R4//{{CYCLE_NRUN}} = """
+                ocean_ice_nrun => nemo_rebuild_restart_nrun
+                nemo_rebuild_restart_nrun [-{{CYCLE_NRUN}}]=> ocean_ice_nrun
+            """
+
+        [[[ graph ]]]
+            R2/^+{{CYCLE_NRUN}}/{{CYCLE_LRUN}} = """
+                nemo_rebuild_restart_lrun[-{{CYCLE_NRUN}}] => validate_lrun_nrun
+                nemo_rebuild_restart_nrun => validate_lrun_nrun {{ '=> housekeeping_restart_work' if HOUSEKEEP else '' }}
+            """
+
+{% if HOUSEKEEP %}
+        [[[ graph ]]]
+            R1/^+{{CYCLE_NRUN}}+{{CYCLE_LRUN}} = """
+                validate_lrun_nrun => housekeeping_restart_share
+            """
+{% endif %}
+
+{% endif %}
+
+{% endif %}

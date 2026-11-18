@@ -1,0 +1,37 @@
+#!/bin/bash
+echo "[INFO] Rebuilding nemo ocean restart file"
+echo "[INFO]   Command: $REBUILD_NEMO_SCRIPT -m $NEMO_RESTART_PATH $NUM_RESTART_FILES"
+$REBUILD_NEMO_SCRIPT -m $NEMO_RESTART_PATH $NUM_RESTART_FILES
+rval=$?
+if [ $rval != 0 ] ; then
+  echo "[FAIL] Failed to rebuild NEMO ocean restart file"
+  exit $rval
+fi
+
+echo "[INFO] Rebuilding SI3 ice restart file"
+echo "[INFO]   Command: $REBUILD_NEMO_SCRIPT -m $SI3_RESTART_PATH $NUM_RESTART_FILES"
+$REBUILD_NEMO_SCRIPT -m $SI3_RESTART_PATH $NUM_RESTART_FILES
+rval=$?
+if [ $rval != 0 ] ; then
+  echo "Failed to rebuild SI3 ice restart file"
+  exit $rval
+fi
+
+echo "[INFO] Rebuilding iceberg restart file using rebuild_nemo"
+echo "[INFO]   Command: $REBUILD_NEMO_SCRIPT -m $ICEBERG_RESTART_PATH $NUM_RESTART_FILES"
+$REBUILD_NEMO_SCRIPT -m $ICEBERG_RESTART_PATH $NUM_RESTART_FILES
+rval=$?
+if [ $rval != 0 ] ; then
+  echo "[FAIL] Failed during stage 1 of rebuilding iceberg restart file"
+  exit $rval
+fi
+echo "[INFO] Rebuilding iceberg restart file using $CYLC_SUITE_DEF_PATH/bin/icb_combrest.py"
+echo "[INFO] ICB_RESTART_PATH =${ICB_RESTART_PATH}"
+echo "[INFO] NUM_RESTART_FILES = ${NUM_RESTART_FILES}"
+echo "[INFO] ICEBERG_REBUILT_PATH = ${ICEBERG_REBUILT_PATH}"  
+python $CYLC_SUITE_DEF_PATH/bin/icb_combrest.py -f ${ICB_RESTART_PATH} -n $NUM_RESTART_FILES -o $ICEBERG_REBUILT_PATH
+rval=$?
+if [ $rval != 0 ] ; then
+  echo "[FAIL] Failed during stage 2 of rebuilding iceberg restart file"
+  exit $rval
+fi

@@ -1,0 +1,257 @@
+#!/bin/bash
+
+PATH=${FCM_MAKE_NEMO_RUN}/extract/nemo/ext/FCM/bin:$PATH
+
+bld_cfg=${CYLC_WORKFLOW_RUN_DIR}/app/fcm_build_nemo-agrif/file/bld_nemo-agrif.cfg
+cpp_cfg=${FCM_MAKE_NEMO_APP}/file/cpp.cfg
+
+[ -d ${FCM_MAKE_NEMO_RUN}/BLD ] || \mkdir -p ${FCM_MAKE_NEMO_RUN}/BLD
+
+if [ "${AGRIF}" = True ] ; then
+
+   cat > ${bld_cfg} << EOF
+
+# ----------------------- FCM extract configuration file -----------------------
+cfg::type                           bld
+cfg::version                        1.0
+
+
+# ------------------------------------------------------------------------------
+# Build information
+# ------------------------------------------------------------------------------
+
+%NCDF_HOME           $NETCDF_DIR
+%NCDF_HOME2          $NETCDF_DIR2
+%HDF5_HOME           $HDF5_DIR
+%XIOS_HOME           $xios_path
+%OASIS_HOME          $prism_path
+
+%NCDF_INC            -I%NCDF_HOME/include -I%HDF5_HOME/include
+#CEB%NCDF_LIB            -L%HDF5_HOME/lib -L%NCDF_HOME/lib -lnetcdf -lnetcdff -lnetcdf -lhdf5 -lhdf5_hl -lhdf5_fortran -lz
+%NCDF_LIB             -L%HDF5_HOME/lib -L%NCDF_HOME/lib -I%NCDF_HOME/include  -lnetcdff -L%NCDF_HOME2/lib -I%NCDF_HOME2/include -Wl,-rpath,%NCDF_HOME2/lib -lnetcdf -lstdc++
+
+
+%XIOS_INC            -I%XIOS_HOME/include
+%XIOS_LIB            -L%XIOS_HOME/lib -lxios -lstdc++
+
+%OASIS_INC           -I%OASIS_HOME/build/lib/psmile.MPI1
+%OASIS_LIB           -L%OASIS_HOME/lib -lpsmile.MPI1 -lmct -lmpeu -lscrip
+
+%CPP                 cpp -Dkey_nosignedzero
+%FC                  mpiifort 
+
+#%FCFLAGS             -s real64 -s integer32 -em -O2,vector1 -hfp0 -hflex_mp=intolerant -h omp -N 1023 # model FAILS
+#%FCFLAGS             -s real64 -s integer32 -em -O1,vector1 -hfp0 -hflex_mp=intolerant -h omp -N 1023 # model RUNS
+#CEB%FCFLAGS          -s real64 -s integer32 -em -O1,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023
+%FCFLAGS              -real-size 64 -integer-size 32 -O1  -init=zero,arrays 
+# For debugging
+#%FCFLAGS             -g -s real64 -s integer32 -em -O0,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023 -eCID
+
+%FFLAGS              %FCFLAGS
+%LD                  mpiifort
+%FPPFLAGS            -P -E -traditional-cpp
+%LDFLAGS             -Wl,--allow-multiple-definition 
+%AR                  ar
+%ARFLAGS             -r
+%MK                  gmake
+
+%USER_INC            %NCDF_INC %XIOS_INC
+%USER_LIB            %NCDF_LIB %XIOS_LIB
+#%USER_INC            %NCDF_INC %XIOS_INC %OASIS_INC
+#%USER_LIB            %NCDF_LIB %XIOS_LIB %OASIS_LIB
+
+%CC                  mpiicc
+%CFLAGS              -O1   
+#CEBbld::tool::fc_modsearch -J
+
+search_src           1
+
+src::ioipsl               ${FCM_MAKE_NEMO_RUN}/extract/ioipsl/src
+src::ppr_1d               ${FCM_MAKE_NEMO_RUN}/extract/nemo/ext/PPR/src
+src::agrif                ${FCM_MAKE_NEMO_RUN}/extract/nemo/ext/AGRIF/AGRIF_FILES
+src::nemo                 ${FCM_MAKE_NEMO_RUN}/NEMOFILES/obj
+
+
+bld::target nemo.exe
+bld::exe_dep
+
+dir::root    ${FCM_MAKE_NEMO_RUN}/BLD
+
+bld::tool::cpp       %CPP
+bld::tool::fpp       %CPP
+bld::tool::fc        %FC
+bld::tool::fflags    %FCFLAGS %USER_INC
+bld::tool::fflags::agrif   %FFLAGS %USER_INC
+bld::tool::ld        %LD
+bld::tool::ldflags   %LDFLAGS %USER_LIB
+bld::tool::ar        %AR
+bld::tool::arflags   %ARFLAGS
+bld::tool::make      %MK
+
+inc ${cpp_cfg}
+
+# Pre-process code before analysing dependencies
+bld::pp::ioipsl   1
+bld::pp::ppr_1d   1
+bld::pp::agrif    1
+bld::pp::nemo     1
+bld::tool::fppflags::ioipsl   %FPPFLAGS
+bld::tool::fppflags::ppr_1d   %FPPFLAGS
+bld::tool::fppflags::agrif    %FPPFLAGS -include ${FCM_MAKE_NEMO_RUN}/extract/nemo/ext/AGRIF/nemo_mpi.h
+bld::tool::fppflags::nemo     %FPPFLAGS -I${FCM_MAKE_NEMO_RUN}/NEMOFILES/inc
+
+# Ignore the following dependencies
+bld::excl_dep        inc::netcdf.inc
+bld::excl_dep        inc::VT.inc
+bld::excl_dep        use::netcdf
+bld::excl_dep        use::xios
+bld::excl_dep        h::netcdf.inc
+bld::excl_dep        h::mpif.h
+bld::excl_dep        inc::mpif.h
+bld::excl_dep        inc::mpe_logf.h
+bld::excl_dep        use::mpi
+bld::excl_dep        use::mod_oasis
+bld::excl_dep        use::mkl_dfti
+bld::excl_dep        use::cudafor
+bld::excl_dep        use::openacc
+
+# Don't generate interface files
+bld::tool::geninterface none
+
+# Allow ".h90" as an extension for CPP include files
+bld::infile_ext::h90  CPP::INCLUDE
+bld::infile_ext::f90  FPP::FPP9X::SOURCE
+
+# extension for module output
+bld::outfile_ext::mod .mod
+
+# rename executable to nemo.exe
+bld::exe_name::model  nemo.exe
+EOF
+
+else
+
+   cat > ${bld_cfg} << EOF
+
+# ----------------------- FCM extract configuration file -----------------------
+cfg::type                           bld
+cfg::version                        1.0
+
+
+# ------------------------------------------------------------------------------
+# Build information
+# ------------------------------------------------------------------------------
+
+%NCDF_HOME           $NETCDF_DIR
+%NCDF_HOME2          $NETCDF_DIR2
+%HDF5_HOME           $HDF5_DIR
+%XIOS_HOME           $xios_path
+%OASIS_HOME          $prism_path
+
+%NCDF_INC            -I%NCDF_HOME/include -I%HDF5_HOME/include
+#CEB%NCDF_LIB            -L%HDF5_HOME/lib -L%NCDF_HOME/lib -lnetcdf -lnetcdff -lnetcdf -lhdf5 -lhdf5_hl -lhdf5_fortran -lz
+%NCDF_LIB            -L%HDF5_HOME/lib -L%NCDF_HOME/lib -I%NCDF_HOME/include  -lnetcdff -L%NCDF_HOME2/lib -I%NCDF_HOME2/include -Wl,-rpath,%NCDF_HOME2/lib -lnetcdf -lstdc++
+
+%XIOS_INC            -I%XIOS_HOME/inc
+%XIOS_LIB            -L%XIOS_HOME/lib -lxios -lstdc++
+
+%OASIS_INC           -I%OASIS_HOME/build/lib/psmile.MPI1
+%OASIS_LIB           -L%OASIS_HOME/lib -lpsmile.MPI1 -lmct -lmpeu -lscrip
+
+%CPP                 cpp -Dkey_nosignedzero
+%FC                  mpiifort
+
+#CEB%FCFLAGS             -s real64 -s integer32 -em -O1,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023
+%FCFLAGS             -real-size 64 -integer-size 32 -O1    -init=zero,arrays 
+# For debugging
+#%FCFLAGS             -g -s real64 -s integer32 -em -O0,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023 -eCID
+
+%FFLAGS              %FCFLAGS
+%LD                  mpiifort
+%FPPFLAGS            -P -E -traditional-cpp
+%LDFLAGS              -Wl,--allow-multiple-definition 
+%AR                  ar
+%ARFLAGS             -r
+%MK                  gmake
+
+# XIOS3
+%USER_INC            %NCDF_INC %XIOS_INC
+%USER_LIB            %NCDF_LIB %XIOS_LIB
+# XIOS2 with OASIS
+#%USER_INC            %NCDF_INC %XIOS_INC %OASIS_INC
+#%USER_LIB            %NCDF_LIB %XIOS_LIB %OASIS_LIB
+
+%CC                  mpiicc 
+%CFLAGS              -O1   
+#CEBbld::tool::fc_modsearch -J
+
+search_src           1
+
+src::ioipsl               ${FCM_MAKE_NEMO_RUN}/extract/ioipsl/src
+src::nemo                 ${FCM_MAKE_NEMO_RUN}/NEMOFILES/obj
+
+
+bld::target nemo.exe
+bld::exe_dep
+
+dir::root    ${FCM_MAKE_NEMO_RUN}/BLD
+
+bld::tool::cpp       %CPP
+bld::tool::fpp       %CPP
+bld::tool::fc        %FC
+bld::tool::fflags    %FCFLAGS %USER_INC
+bld::tool::ld        %LD
+bld::tool::ldflags   %LDFLAGS %USER_LIB
+bld::tool::ar        %AR
+bld::tool::arflags   %ARFLAGS
+bld::tool::make      %MK
+
+inc ${cpp_cfg}
+
+# Pre-process code before analysing dependencies
+bld::pp::ioipsl   1
+bld::pp::nemo     1
+bld::tool::fppflags::ioipsl   %FPPFLAGS
+bld::tool::fppflags::nemo     %FPPFLAGS 
+
+# Ignore the following dependencies
+bld::excl_dep        inc::netcdf.inc
+bld::excl_dep        inc::VT.inc
+bld::excl_dep        use::netcdf
+bld::excl_dep        use::xios
+bld::excl_dep        h::netcdf.inc
+bld::excl_dep        h::mpif.h
+bld::excl_dep        inc::mpif.h
+bld::excl_dep        inc::mpe_logf.h
+bld::excl_dep        use::mpi
+bld::excl_dep        use::mod_oasis
+bld::excl_dep        use::mkl_dfti
+bld::excl_dep        use::cudafor
+bld::excl_dep        use::openacc
+
+
+# Don't generate interface files
+bld::tool::geninterface none
+
+# Allow ".h90" as an extension for CPP include files
+bld::infile_ext::h90  CPP::INCLUDE
+bld::infile_ext::f90  FPP::FPP9X::SOURCE
+
+# extension for module output
+bld::outfile_ext::mod .mod
+
+# rename executable to nemo.exe
+bld::exe_name::model  nemo.exe
+EOF
+
+fi
+
+fcm build --ignore-lock -v 1 -j ${ROSE_TASK_N_JOBS} ${bld_cfg}
+
+# rename executable to nemo.exe or nemo-si3.exe
+si3="$( cat ${cpp_cfg} | grep si3 )"
+[ -z "$si3" ] && si3="false" || si3="true"
+
+if [ -f ${FCM_MAKE_NEMO_RUN}/BLD/bin/nemo.exe ] && [ "${si3}" == "true" ]; then
+   mv  ${FCM_MAKE_NEMO_RUN}/BLD/bin/nemo.exe ${FCM_MAKE_NEMO_RUN}/BLD/bin/nemo-si3.exe
+fi

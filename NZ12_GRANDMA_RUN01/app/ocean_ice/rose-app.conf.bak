@@ -1,0 +1,14 @@
+import=nemo si3
+
+[command]
+default=run_model
+
+[env]
+DATAW=$CYLC_TASK_WORK_DIR
+MPICH_COLL_SYNC=MPI_Gatherv
+NEMO_VERSION=402
+OCEAN_EXEC=$CYLC_WORKFLOW_SHARE_DIR/fcm_make_ocean/BLD/bin/nemo-si3.exe
+PRINT_STATUS=PrStatus_Min
+models=nemo si3 xios
+AGRIF=$AGRIF
+agrif_domains=$AGRIF_DOMAINS

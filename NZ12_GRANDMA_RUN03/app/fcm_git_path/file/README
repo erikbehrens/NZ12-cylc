@@ -1,0 +1,100 @@
+The app will read in the fcm_make_ocean Rose configuration file (app/fcm_make_ocean/rose-app.conf)
+and look for the following entries under [env]:
+
+    * nemo_sources
+    * nemo_project_location
+    * nemo_base
+    * nemo_rev
+
+Git URLs will be cloned to local directories under ${ROOT_LOCAL} if these clones do not exist.
+These local paths will be copied into another configuration file (app/fcm_make_ocean/opt/rose-app-gitpaths.conf),
+which will be used by fcm_make_ocean as an optional configuration. The git URLs in app/fcm_make_ocean/rose-app.conf
+will therefore be replaced by paths to local clones at fcm_make_ocean runtime.
+
+Git URLs are any of:
+
+    * <GIT>
+    * <GIT>/<branch>
+    * <GIT>@<hash>
+    * <GIT>/<branch>@<hash>
+
+where <GIT> is any repository URL matching one of:
+
+    * (git@).*(.git)
+    * (http://).*(.git)
+    * (https://).*(.git)
+
+<branch> is any git branch or tag name. <hash> is a git commit hash that should be valid for <branch>, which
+can be given in truncated form (e.g. "abcd12" instead of "abcd1234567890abcde") as long as there is no ambiguity
+with other commit hashes on the repository.
+
+For the NEMO Gitlab, valid git URLs might be:
+
+    * git@forge.nemo-ocean.eu:nemo/nemo.git                 # Current head, "main" branch
+    * https://forge.nemo-ocean.eu/nemo/nemo.git             # "    "
+    * https://forge.nemo-ocean.eu/nemo/nemo.git/test        # Current head, "test" branch
+    * https://forge.nemo-ocean.eu/nemo/nemo.git/4.2.0       # Commit corresponding to the "4.2.0" tag, "main" branch
+    * https://forge.nemo-ocean.eu/nemo/nemo.git@38d685      # Commit 38d6856256fa965ad93fdf3ee241d2dd2431575f, "main" branch
+    * https://forge.nemo-ocean.eu/nemo/nemo.git/main@38d685 # "    "
+
+
+The path conversions behave as follows, with <GIT> corresponding to "https://forge.nemo-ocean.eu/nemo/nemo.git":
+
+    nemo_project_location
+    =====================
+
+        <GIT>             => ${ROOT_LOCAL}/forge.nemo-ocean.eu/nemo/nemo
+        <any_other_entry> => <NO CHANGE>
+
+    nemo_base
+    =========
+
+        If nemo_project_location is a git path:
+
+            <no_entry>        => main
+            <any_other_entry> => <NO CHANGE>
+
+        Otherwise, nemo_base is unchanged.
+
+    nemo_rev
+    ========
+
+        If nemo_project_location is a git path:
+
+            <any_octal_hash>  => /<SHORT_OCTAL>
+            <any_other_entry> => /<HEAD>
+
+            * <SHORT_OCTAL> is the first 6 characters of <any_octal_hash>
+            * <HEAD> is the first 6 characters of the head commit of the git path.
+
+        Otherwise, nemo_rev is unchanged.
+
+    nemo_sources
+    ============
+
+        Each path in the list will be processed and replaced individually if needed.
+
+        Absolute paths:
+
+            <GIT>                           => ${ROOT_LOCAL}/forge.nemo-ocean.eu/nemo/nemo/main/<HEAD>
+            <GIT>/branch                    => ${ROOT_LOCAL}/forge.nemo-ocean.eu/nemo/nemo/branch/<HEAD>
+            <GIT>@abcd1234                  => ${ROOT_LOCAL}/forge.nemo-ocean.eu/nemo/nemo/main/abcd12
+            <GIT>/branch@abcd1234           => ${ROOT_LOCAL}/forge.nemo-ocean.eu/nemo/nemo/branch/abcd12
+            <SVN>:repos/absolute/path       => <NO CHANGE>
+            <SVN>:repos/absolute/path@12345 => <NO CHANGE>
+            /absolute/path                  => <NO CHANGE>
+
+            * <SVN> is either "fcm" or "svn"
+            * <HEAD> is the first 6 characters of the head commit of the git path
+
+        Relative paths:
+
+            If nemo_project_location is a git path (assumed here to be <GIT>):
+
+                path          => ${ROOT_LOCAL}/forge.nemo-ocean.eu/nemo/nemo/path/<HEAD>
+                path@abcd1234 => ${ROOT_LOCAL}/forge.nemo-ocean.eu/nemo/nemo/path/abcd12
+                longer/path   => <NO CHANGE>
+
+                * <HEAD> is the first 6 characters of the head commit of the git path
+
+            Otherwise, the relative path is unchanged.
