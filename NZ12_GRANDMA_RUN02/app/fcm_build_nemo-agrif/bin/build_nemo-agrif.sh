@@ -44,6 +44,8 @@ cfg::version                        1.0
 #%FCFLAGS             -s real64 -s integer32 -em -O1,vector1 -hfp0 -hflex_mp=intolerant -h omp -N 1023 # model RUNS
 #CEB%FCFLAGS          -s real64 -s integer32 -em -O1,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023
 %FCFLAGS              -real-size 64 -integer-size 32 -O1
+
+#%FCFLAGS              -real-size 64 -integer-size 32 -O0 -g -traceback -check bounds
 # For debugging
 #%FCFLAGS             -g -s real64 -s integer32 -em -O0,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023 -eCID
 
@@ -163,6 +165,7 @@ cfg::version                        1.0
 
 #CEB%FCFLAGS             -s real64 -s integer32 -em -O1,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023
 %FCFLAGS              -real-size 64 -integer-size 32 -O1
+#%FCFLAGS              -real-size 64 -integer-size 32 -O0 -g -traceback -check bounds
 # For debugging
 #%FCFLAGS             -g -s real64 -s integer32 -em -O0,vector0 -hvector0 -hfp0 -hflex_mp=intolerant -h omp -N 1023 -eCID
 

@@ -485,6 +485,9 @@ nn_jctle=0,
 nn_jctls=0,
 nn_jsplt=1,
 sn_cfctl%l_oceout=.true.,
+sn_cfctl%l_prttrc  = .false.,
+sn_cfctl%l_trcstat = .true.,
+sn_cfctl%ptimincr  = 1,
 /
 &namsto
 cn_storst_in='restart_sto',

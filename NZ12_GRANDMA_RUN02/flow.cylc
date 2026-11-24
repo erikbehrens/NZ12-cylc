@@ -322,7 +322,7 @@
             -koed =
             -l walltime=2:00:00
             -q=shortq
-            -l select=4:ncpus=384:mem=600gb:ompthreads=1 
+            -l select=4:ncpus=384:mem=730gb:ompthreads=1
     [[ocean_ice]]
         inherit = OCEAN_ICE, OCEAN_ICE_RESOURCE
 

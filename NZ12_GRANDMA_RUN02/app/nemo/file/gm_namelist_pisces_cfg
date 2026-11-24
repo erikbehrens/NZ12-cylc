@@ -7,3 +7,7 @@
    ln_ligand   = .false.
    ln_sediment = .false.
 /
+&namtrc_opt
+   ln_varpar = .false.
+   parlux    = 0.43
+/
